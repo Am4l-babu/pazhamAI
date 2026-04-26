@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ml">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Result – പഴംAI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      /* ── Banana CSS text logo ─────────────────────────────── */
+
+      .banana-logo-wrap {
+        display: flex; justify-content: center;
+        align-items: center; margin: 0 0 0.5rem; padding: 0.3rem 0;
+      }
+      .banana-logo {
+        font-family: 'Baloo 2', cursive;
+        font-size: clamp(2.6rem, 8vw, 4.6rem);
+        font-weight: 800; line-height: 1.05;
+        letter-spacing: 0.04em; margin: 0; display: inline-block;
+        background:
+          repeating-linear-gradient(94deg,
+            transparent 0px, transparent 11px,
+            rgba(160,90,0,0.09) 11px, rgba(160,90,0,0.09) 13px),
+          linear-gradient(155deg,
+            #FFF59D 0%, #FFE033 8%, #FFD700 20%,
+            #FFC300 33%, #FFB300 46%, #FFA000 60%,
+            #E8820C 74%, #C9610A 86%, #FFD700 100%);
+        -webkit-background-clip: text; background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter:
+          drop-shadow(0px -1px 0px rgba(255,255,180,0.55))
+          drop-shadow(1px  2px 0px #8B5000)
+          drop-shadow(3px  5px 0px #5C3200)
+          drop-shadow(5px  9px 2px rgba(60,25,0,0.8))
+          drop-shadow(0px  0px 28px rgba(255,185,0,0.30));
+        animation: bananaGlow 4s ease-in-out infinite;
+      }
+      @keyframes bananaGlow {
+        0%,100% { filter:
+          drop-shadow(0px -1px 0px rgba(255,255,180,0.55))
+          drop-shadow(1px 2px 0px #8B5000) drop-shadow(3px 5px 0px #5C3200)
+          drop-shadow(5px 9px 2px rgba(60,25,0,0.8))
+          drop-shadow(0px 0px 22px rgba(255,185,0,0.22)); }
+        50% { filter:
+          drop-shadow(0px -1px 0px rgba(255,255,200,0.70))
+          drop-shadow(1px 2px 0px #8B5000) drop-shadow(3px 5px 0px #5C3200)
+          drop-shadow(5px 9px 2px rgba(60,25,0,0.8))
+          drop-shadow(0px 0px 50px rgba(255,200,0,0.58)); }
+      }
+      /* ── Result-page extras ─────────────────────────────────── */
+
+      .result-wrapper {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+      }
+      @media (max-width: 680px) { .result-wrapper { grid-template-columns: 1fr; } }
+
+      .result-image {
+        width: 100%;
+        max-height: 320px;
+        object-fit: cover;
+        border-radius: 16px;
+        box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+        border: 2px solid rgba(255,215,0,0.2);
+      }
+
+      /* Badge */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.3rem 0.9rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+      .badge-yes  { background:rgba(74,222,128,.12); color:#4ade80; border:1px solid #4ade80; }
+      .badge-no   { background:rgba(248,113,113,.12); color:#f87171; border:1px solid #f87171; }
+      .badge-warn { background:rgba(255,215,0,.12);  color:#FFD700;  border:1px solid #FFD700; }
+
+      /* Ripeness bar */
+      .ripeness-bar-wrap { margin: 1rem 0 0.4rem; }
+      .ripeness-bar-track {
+        position: relative;
+        height: 10px;
+        border-radius: 999px;
+        background: linear-gradient(to right, #22c55e, #a3e635, #facc15, #f97316, #7f1d1d);
+      }
+      .ripeness-marker {
+        position: absolute;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 20px; height: 20px;
+        border-radius: 50%;
+        background: #fff;
+        border: 3px solid #FFD700;
+        box-shadow: 0 0 10px rgba(255,215,0,0.7);
+        transition: left 0.7s cubic-bezier(.34,1.56,.64,1);
+      }
+      .ripeness-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.67rem;
+        color: #6b5830;
+        margin-top: 0.35rem;
+      }
+
+      /* Section label */
+      .section-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #7a5f20;
+        margin-bottom: 0.5rem;
+      }
+
+      /* Notes box */
+      .notes-box {
+        background: rgba(255,215,0,0.05);
+        border-left: 3px solid #FFD700;
+        border-radius: 0 10px 10px 0;
+        padding: 0.8rem 1rem;
+        font-size: 0.86rem;
+        color: #c8a96e;
+        margin-top: 1rem;
+        line-height: 1.6;
+      }
+
+      /* Error box */
+      .error-box {
+        background: rgba(239,68,68,.1);
+        border: 1px solid #ef4444;
+        border-radius: 12px;
+        padding: 1.2rem;
+        color: #fca5a5;
+        margin-top: 1rem;
+        line-height: 1.6;
+        font-size: 0.88rem;
+      }
+
+      /* Confidence pip */
+      .pip { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
+      .pip-high   { background:#4ade80; }
+      .pip-medium { background:#fbbf24; }
+      .pip-low    { background:#f87171; }
+
+      /* Stat grid — only 1 card now (seed count) */
+      .stat-grid { display:grid; grid-template-columns:1fr; gap:1rem; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="banana-logo-wrap">
+        <h1 class="banana-logo">പഴം AI</h1>
+      </div>
+      <p style="text-align:center; font-family:'Baloo 2',cursive; font-size:1rem; color:#FFD700; margin-bottom:1rem; letter-spacing:0.05em; opacity:0.85;">
+        🔬 Analysis Result
+      </p>
+
+      {# ── ERROR ──────────────────────────────────────────── #}
+      {% if result.error %}
+        <div class="error-box">
+          <i class="fas fa-triangle-exclamation"></i>
+          <strong> Analysis Error:</strong> {{ result.error }}
+        </div>
+
+      {# ── NOT A BANANA ────────────────────────────────────── #}
+      {% elif not result.is_banana %}
+        <div class="result-card" style="text-align:center; padding:2.5rem;">
+          <img src="{{ url_for('static', filename='uploads/' + filename) }}"
+               alt="Uploaded image"
+               class="result-image"
+               style="max-width:320px; margin:0 auto 1.5rem; display:block;" />
+          <span class="badge badge-no" style="font-size:1rem; padding:.55rem 1.3rem;">
+            <i class="fas fa-ban"></i> Not a Banana
+          </span>
+          <p style="margin-top:1rem; color:#7a5f20; font-size:.9rem;">
+            {{ result.ripeness_desc }}
+            {% if result.notes %}<br/><em>{{ result.notes }}</em>{% endif %}
+          </p>
+        </div>
+
+      {# ── BANANA DETECTED ─────────────────────────────────── #}
+      {% else %}
+        <div class="result-card">
+          <div class="result-wrapper">
+
+            <!-- Left: image -->
+            <div>
+              <p class="section-label">Uploaded Image</p>
+              <img src="{{ url_for('static', filename='uploads/' + filename) }}"
+                   alt="Analysed banana"
+                   class="result-image" />
+
+              <div style="margin-top:.8rem; display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;">
+                <span class="badge badge-yes">
+                  <i class="fas fa-circle-check"></i> Banana Detected
+                </span>
+                <span style="font-size:.8rem; color:#7a5f20;">
+                  <span class="pip pip-{{ result.confidence }}"></span>
+                  {{ result.confidence | capitalize }} confidence
+                </span>
+              </div>
+
+              {% if result.visual_clues %}
+              <p style="margin-top:.65rem; font-size:.8rem; color:#7a5f20; font-style:italic;">
+                <i class="fas fa-eye" style="margin-right:.3rem; color:#FFD700;"></i>{{ result.visual_clues }}
+              </p>
+              {% endif %}
+            </div>
+
+            <!-- Right: stats -->
+            <div>
+              <!-- Ripeness -->
+              <p class="section-label">Ripeness</p>
+              <div style="display:flex; align-items:center; gap:.7rem; flex-wrap:wrap; margin-bottom:.4rem;">
+                <span style="font-family:'Baloo 2',cursive; font-size:1.4rem; font-weight:700; color:#FFD700;">
+                  {{ result.ripeness_label }}
+                </span>
+                <span class="badge badge-warn" style="font-size:.78rem;">
+                  Level {{ result.ripeness }} / 5
+                </span>
+              </div>
+
+              <div class="ripeness-bar-wrap">
+                <div class="ripeness-bar-track">
+                  <div class="ripeness-marker"
+                       style="left:calc({{ ((result.ripeness - 1) / 4) * 100 }}%);">
+                  </div>
+                </div>
+                <div class="ripeness-labels">
+                  <span>Unripe</span>
+                  <span>Slight</span>
+                  <span>Semi</span>
+                  <span>Ripe</span>
+                  <span>Over</span>
+                </div>
+              </div>
+
+              <p style="font-size:.84rem; color:#7a5f20; margin-bottom:1.3rem;">
+                {{ result.ripeness_desc }}
+              </p>
+
+              <!-- Seed count (no range shown) -->
+              <p class="section-label">Predicted Values</p>
+              <div class="stat-grid">
+                <div class="stat-card">
+                  <div class="icon">🌱</div>
+                  <div class="label">Estimated Seed Count</div>
+                  <div class="value">~{{ result.seeds }}</div>
+                </div>
+              </div>
+
+              {% if result.notes %}
+              <div class="notes-box">
+                <i class="fas fa-comment-dots" style="color:#FFD700; margin-right:.35rem;"></i>
+                {{ result.notes }}
+              </div>
+              {% endif %}
+            </div>
+
+          </div>
+        </div>
+      {% endif %}
+
+      <a href="{{ url_for('index') }}" class="fun-button back-button">
+        <i class="fas fa-arrow-left"></i> Analyse Another
+      </a>
+    </div>
+  </body>
+</html>

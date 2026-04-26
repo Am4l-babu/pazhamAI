@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ml">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>പഴംAI – Banana Intelligence</title>
+    <meta name="description" content="Upload a banana image and let AI detect ripeness and estimate seed count." />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      /* ═══════════════════════════════════════════════════════════
+         BANANA TEXT LOGO  —  letters look carved from real bananas
+         Technique: chunky rounded font  +  banana-skin gradient
+                    background-clip:text  +  layered 3D drop-shadows
+      ═══════════════════════════════════════════════════════════ */
+
+      /* Wrapper keeps the title centred */
+      .banana-logo-wrap {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 0.2rem 0 0.5rem;
+        overflow: visible;
+        padding: 0.4rem 0;
+      }
+
+      .banana-logo {
+        /* Rounded, chunky font — Baloo 2 at max weight */
+        font-family: 'Baloo 2', cursive;
+        font-size: clamp(3.4rem, 10.5vw, 6.2rem);
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: 0.04em;
+        margin: 0;
+        position: relative;
+        display: inline-block;
+
+        /* ── Banana-skin colour fill ─────────────────────────── */
+        /* Layer 1: faint longitudinal rib lines (like banana skin) */
+        /* Layer 2: warm yellow→orange depth gradient              */
+        background:
+          repeating-linear-gradient(
+            94deg,
+            transparent          0px,
+            transparent          11px,
+            rgba(160,90,0,0.09)  11px,
+            rgba(160,90,0,0.09)  13px
+          ),
+          linear-gradient(
+            155deg,
+            #FFF59D  0%,
+            #FFE033  8%,
+            #FFD700  20%,
+            #FFC300  33%,
+            #FFB300  46%,
+            #FFA000  60%,
+            #E8820C  74%,
+            #C9610A  86%,
+            #FFD700  100%
+          );
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+
+        /* ── 3-D raised banana effect via layered drop-shadows ── */
+        /* highlight on top edge → dark brown step 1 → step 2 → ground blur */
+        filter:
+          drop-shadow(0px -1px 0px rgba(255,255,180,0.55))
+          drop-shadow(1px  2px 0px #8B5000)
+          drop-shadow(3px  5px 0px #5C3200)
+          drop-shadow(5px  9px 2px rgba(60,25,0,0.8))
+          drop-shadow(0px  0px 28px rgba(255,185,0,0.30));
+
+        /* ── Slow warm glow pulse ────────────────────────────── */
+        animation: bananaGlow 4s ease-in-out infinite;
+      }
+
+      @keyframes bananaGlow {
+        0%,100% {
+          filter:
+            drop-shadow(0px -1px 0px rgba(255,255,180,0.55))
+            drop-shadow(1px  2px 0px #8B5000)
+            drop-shadow(3px  5px 0px #5C3200)
+            drop-shadow(5px  9px 2px rgba(60,25,0,0.8))
+            drop-shadow(0px  0px 22px rgba(255,185,0,0.22));
+        }
+        50% {
+          filter:
+            drop-shadow(0px -1px 0px rgba(255,255,200,0.70))
+            drop-shadow(1px  2px 0px #8B5000)
+            drop-shadow(3px  5px 0px #5C3200)
+            drop-shadow(5px  9px 2px rgba(60,25,0,0.8))
+            drop-shadow(0px  0px 50px rgba(255,200,0,0.58));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+
+      <!-- ── Header ── -->
+      <header>
+        <!-- Banana CSS text logo — no image needed -->
+        <div class="banana-logo-wrap">
+          <h1 class="banana-logo">പഴം AI</h1>
+        </div>
+
+        <div class="header-media">
+          <!-- Minion GIF — left -->
+          <img src="{{ url_for('static', filename='source.gif') }}"
+               alt="Dancing Minion"
+               class="minion-gif" />
+
+          <!-- Hero banana photo — right -->
+          <img src="{{ url_for('static', filename='putu_img.jpeg') }}"
+               alt="Fresh Banana"
+               class="hero-banana-img" />
+        </div>
+
+        <p class="description">
+          Upload a banana photo — AI will check ripeness &amp; estimate seed count 🍌
+        </p>
+      </header>
+
+      <!-- ── Upload Section ── -->
+      <div class="upload-section">
+
+        <!-- File upload card -->
+        <div class="upload-card">
+          <h2><i class="fas fa-upload"></i> Upload Image</h2>
+          <form action="{{ url_for('upload') }}"
+                method="post"
+                enctype="multipart/form-data"
+                class="upload-form"
+                id="uploadForm">
+
+            <div class="file-input-wrapper">
+              <input type="file"
+                     name="image"
+                     accept="image/*"
+                     required
+                     id="fileInput" />
+              <label for="fileInput" class="file-label" id="fileLabel">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <span id="fileLabelText">Choose a file or drag it here</span>
+              </label>
+            </div>
+
+            <!-- Confirmation message shown after file selection -->
+            <div id="confirm-toast">
+              <i class="fas fa-circle-check"></i>
+              <span>Selected: <span id="selected-filename"></span></span>
+            </div>
+
+            <button type="submit" class="fun-button" style="margin-top:1rem; width:100%;">
+              <i class="fas fa-magnifying-glass"></i> Analyse Banana
+            </button>
+          </form>
+        </div>
+
+        <!-- Camera card -->
+        <div class="camera-card">
+          <h2><i class="fas fa-camera"></i> Use Camera</h2>
+          <div class="camera-wrapper">
+            <video id="video" width="280" height="210" autoplay></video>
+            <button id="snap" class="fun-button">
+              <i class="fas fa-camera"></i> Capture Photo
+            </button>
+          </div>
+          <canvas id="canvas" width="280" height="210" style="display:none;"></canvas>
+          <form id="cameraForm"
+                action="{{ url_for('upload') }}"
+                method="post"
+                enctype="multipart/form-data"
+                style="display:none;">
+            <input type="file" id="cameraImage" name="image" accept="image/*" />
+          </form>
+        </div>
+
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='camera.js') }}"></script>
+    <script>
+      // ── File selection confirmation ────────────────────────────
+      const fileInput   = document.getElementById('fileInput');
+      const toast       = document.getElementById('confirm-toast');
+      const nameSpan    = document.getElementById('selected-filename');
+      const labelText   = document.getElementById('fileLabelText');
+
+      fileInput.addEventListener('change', function () {
+        if (this.files && this.files.length > 0) {
+          const name = this.files[0].name;
+          nameSpan.textContent = name;
+          labelText.textContent = '✅ ' + name;
+          toast.classList.add('visible');
+        }
+      });
+
+      // Drag-over highlight
+      const label = document.getElementById('fileLabel');
+      label.addEventListener('dragover',  () => label.classList.add('drag-over'));
+      label.addEventListener('dragleave', () => label.classList.remove('drag-over'));
+      label.addEventListener('drop',      () => label.classList.remove('drag-over'));
+    </script>
+  </body>
+</html>

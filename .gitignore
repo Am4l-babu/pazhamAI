@@ -1,0 +1,36 @@
+# Large model/binary files
+best_model.pth
+*.pth
+*.h5
+*.pt
+
+# Large static assets
+*.gif
+
+# Secrets / environment
+.env
+webapp/.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.pyc
+*.egg-info/
+dist/
+build/
+.eggs/
+*.env
+venv/
+.venv/
+
+# Uploaded images (runtime files, not source)
+webapp/uploads/
+webapp/static/uploads/
+putu_img.jpeg
+webapp/static/putu_img.jpeg
+
+# OS
+.DS_Store
+Thumbs.db
