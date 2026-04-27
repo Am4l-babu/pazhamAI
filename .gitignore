@@ -4,8 +4,8 @@ best_model.pth
 *.h5
 *.pt
 
-# Large static assets
-*.gif
+# Large static assets (keep webapp/static assets tracked for Vercel)
+# *.gif  <-- removed so source.gif is deployed
 
 # Secrets / environment
 .env
@@ -28,8 +28,6 @@ venv/
 # Uploaded images (runtime files, not source)
 webapp/uploads/
 webapp/static/uploads/
-putu_img.jpeg
-webapp/static/putu_img.jpeg
 
 # OS
 .DS_Store
