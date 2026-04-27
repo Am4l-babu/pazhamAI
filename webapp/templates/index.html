@@ -114,9 +114,11 @@
                class="minion-gif" />
 
           <!-- Hero banana photo — right -->
-          <img src="{{ url_for('static', filename='putturumees.jpeg') }}"
-               alt="എന്താടാ പഴത്തിന്റെ കുരു എണ്ണേണോ നിനക്ക്?"
-               class="hero-banana-img" />
+          <video class="hero-banana-img"
+                 autoplay loop muted playsinline
+                 style="object-fit:cover;">
+            <source src="{{ url_for('static', filename='putturumees_gif.mp4') }}" type="video/mp4" />
+          </video>
         </div>
 
         <p class="description">
