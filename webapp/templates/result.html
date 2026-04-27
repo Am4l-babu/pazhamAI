@@ -172,7 +172,7 @@
       {# ── NOT A BANANA ────────────────────────────────────── #}
       {% elif not result.is_banana %}
         <div class="result-card" style="text-align:center; padding:2.5rem;">
-          <img src="{{ url_for('static', filename='uploads/' + filename) }}"
+          <img src="{{ url_for('uploaded_file', filename=filename) }}"
                alt="Uploaded image"
                class="result-image"
                style="max-width:320px; margin:0 auto 1.5rem; display:block;" />
@@ -193,7 +193,7 @@
             <!-- Left: image -->
             <div>
               <p class="section-label">Uploaded Image</p>
-              <img src="{{ url_for('static', filename='uploads/' + filename) }}"
+              <img src="{{ url_for('uploaded_file', filename=filename) }}"
                    alt="Analysed banana"
                    class="result-image" />
 

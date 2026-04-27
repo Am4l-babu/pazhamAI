@@ -50,13 +50,24 @@ RIPENESS_DESCRIPTIONS = {
 }
 
 # ── Groq API setup ───────────────────────────────────────────────────────────
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    raise EnvironmentError("GROQ_API_KEY not set. Add it to your .env file or environment variables.")
-_client = Groq(api_key=GROQ_API_KEY)
-
-# Vision model — Llama 4 Scout has strong vision on Groq free tier
+# NOTE: Client is created lazily so a missing key produces a clean error
+# response instead of crashing the Python process at import time (Vercel).
+_client = None
 VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
+
+def _get_client() -> Groq:
+    """Return (and cache) the Groq client, raising clearly if key is absent."""
+    global _client
+    if _client is None:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise EnvironmentError(
+                "GROQ_API_KEY is not set. "
+                "Add it to your Vercel project's Environment Variables."
+            )
+        _client = Groq(api_key=api_key)
+    return _client
 
 
 def _encode_image_b64(image_path: str) -> str:
@@ -115,7 +126,7 @@ If the image does NOT contain a banana:
 
 Return ONLY the JSON. No markdown. No backticks."""
 
-        response = _client.chat.completions.create(
+        response = _get_client().chat.completions.create(
             model=VISION_MODEL,
             messages=[
                 {
