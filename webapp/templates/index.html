@@ -1,211 +1,375 @@
 <!DOCTYPE html>
-<html lang="ml">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>പഴംAI – Banana Intelligence</title>
-    <meta name="description" content="Upload a banana image and let AI detect ripeness and estimate seed count." />
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
-    <style>
-      /* ═══════════════════════════════════════════════════════════
-         BANANA TEXT LOGO  —  letters look carved from real bananas
-         Technique: chunky rounded font  +  banana-skin gradient
-                    background-clip:text  +  layered 3D drop-shadows
-      ═══════════════════════════════════════════════════════════ */
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pazham — Banana Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+  <style>
+    :root{
+      --bg:#0b0906; --cream:#fdfbf3; --ink:#1a1408; --gold:#f5c800;
+      --muted:rgba(0,0,0,.4);
+      --serif:'Fraunces',Georgia,serif; --sans:'Inter','Helvetica Neue',sans-serif;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    html{scroll-behavior:auto;}
+    body{background:var(--bg);font-family:var(--sans);color:var(--ink);
+         overflow-x:hidden;-webkit-font-smoothing:antialiased;}
 
-      /* Wrapper keeps the title centred */
-      .banana-logo-wrap {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 0.2rem 0 0.5rem;
-        overflow: visible;
-        padding: 0.4rem 0;
-      }
+    /* ════════ HERO (canvas frame-sequence scrub) ════════ */
+    #hero{height:520vh;position:relative;}
+    #stage{position:sticky;top:0;height:100vh;width:100%;overflow:hidden;background:var(--bg);}
 
-      .banana-logo {
-        /* Rounded, chunky font — Baloo 2 at max weight */
-        font-family: 'Baloo 2', cursive;
-        font-size: clamp(3.4rem, 10.5vw, 6.2rem);
-        font-weight: 800;
-        line-height: 1.05;
-        letter-spacing: 0.04em;
-        margin: 0;
-        position: relative;
-        display: inline-block;
+    #fc{position:absolute;inset:0;width:100%;height:100%;display:block;}
 
-        /* ── Banana-skin colour fill ─────────────────────────── */
-        /* Layer 1: faint longitudinal rib lines (like banana skin) */
-        /* Layer 2: warm yellow→orange depth gradient              */
-        background:
-          repeating-linear-gradient(
-            94deg,
-            transparent          0px,
-            transparent          11px,
-            rgba(160,90,0,0.09)  11px,
-            rgba(160,90,0,0.09)  13px
-          ),
-          linear-gradient(
-            155deg,
-            #FFF59D  0%,
-            #FFE033  8%,
-            #FFD700  20%,
-            #FFC300  33%,
-            #FFB300  46%,
-            #FFA000  60%,
-            #E8820C  74%,
-            #C9610A  86%,
-            #FFD700  100%
-          );
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
+    /* loading shimmer until frames ready */
+    #loader{
+      position:absolute;inset:0;z-index:3;
+      display:flex;align-items:center;justify-content:center;
+      background:var(--bg);transition:opacity .6s ease;
+    }
+    #loader .ring{
+      width:42px;height:42px;border-radius:50%;
+      border:2px solid rgba(245,200,0,.18);border-top-color:var(--gold);
+      animation:spin .9s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg);}}
 
-        /* ── 3-D raised banana effect via layered drop-shadows ── */
-        /* highlight on top edge → dark brown step 1 → step 2 → ground blur */
-        filter:
-          drop-shadow(0px -1px 0px rgba(255,255,180,0.55))
-          drop-shadow(1px  2px 0px #8B5000)
-          drop-shadow(3px  5px 0px #5C3200)
-          drop-shadow(5px  9px 2px rgba(60,25,0,0.8))
-          drop-shadow(0px  0px 28px rgba(255,185,0,0.30));
+    /* cinematic vignette */
+    #stage::after{
+      content:'';position:absolute;inset:0;pointer-events:none;z-index:2;
+      background:
+        radial-gradient(ellipse at center,transparent 42%,rgba(0,0,0,.5) 100%),
+        linear-gradient(to bottom,rgba(0,0,0,.45) 0%,transparent 24%,transparent 68%,rgba(11,9,6,.9) 100%);
+    }
 
-        /* ── Slow warm glow pulse ────────────────────────────── */
-        animation: bananaGlow 4s ease-in-out infinite;
-      }
+    /* ════════ HERO UI ════════ */
+    .hud{position:absolute;inset:0;z-index:5;pointer-events:none;}
+    #brand{position:absolute;top:50%;left:7vw;transform:translateY(-50%);
+           text-align:left;will-change:opacity,transform;}
+    #brand h1{
+      font-family:var(--serif);font-weight:300;
+      font-size:clamp(2rem,4.4vw,3.6rem);letter-spacing:.30em;text-indent:.30em;
+      line-height:1.05;color:#fff;text-shadow:0 2px 50px rgba(0,0,0,.7);
+    }
+    #brand .sub{margin-top:.9rem;font-size:.58rem;font-weight:400;letter-spacing:.4em;
+                text-transform:uppercase;color:rgba(255,255,255,.55);}
+    @media(max-width:640px){
+      #brand{left:0;width:100%;text-align:center;top:9vh;transform:none;}
+      #brand h1{font-size:clamp(2.2rem,9vw,3rem);letter-spacing:.28em;text-indent:.28em;}
+    }
 
-      @keyframes bananaGlow {
-        0%,100% {
-          filter:
-            drop-shadow(0px -1px 0px rgba(255,255,180,0.55))
-            drop-shadow(1px  2px 0px #8B5000)
-            drop-shadow(3px  5px 0px #5C3200)
-            drop-shadow(5px  9px 2px rgba(60,25,0,0.8))
-            drop-shadow(0px  0px 22px rgba(255,185,0,0.22));
-        }
-        50% {
-          filter:
-            drop-shadow(0px -1px 0px rgba(255,255,200,0.70))
-            drop-shadow(1px  2px 0px #8B5000)
-            drop-shadow(3px  5px 0px #5C3200)
-            drop-shadow(5px  9px 2px rgba(60,25,0,0.8))
-            drop-shadow(0px  0px 50px rgba(255,200,0,0.58));
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
+    #lead{position:absolute;bottom:16vh;width:100%;text-align:center;padding:0 8vw;
+          will-change:opacity,transform;opacity:0;}
+    #lead p{font-family:var(--serif);font-weight:300;font-size:clamp(1.1rem,2.6vw,1.9rem);
+            line-height:1.4;color:#fff;text-shadow:0 2px 30px rgba(0,0,0,.7);}
 
-      <!-- ── Header ── -->
-      <header>
-        <!-- Banana CSS text logo — no image needed -->
-        <div class="banana-logo-wrap">
-          <h1 class="banana-logo">പഴം AI</h1>
-        </div>
+    #scrollHint{position:absolute;bottom:5vh;width:100%;text-align:center;
+                font-size:.56rem;letter-spacing:.42em;text-transform:uppercase;
+                color:rgba(255,255,255,.5);will-change:opacity;}
+    #scrollHint::after{content:'';display:block;margin:8px auto 0;width:1px;height:30px;
+                       background:linear-gradient(to bottom,rgba(255,255,255,.6),transparent);
+                       animation:pulse 2.2s ease-in-out infinite;}
+    @keyframes pulse{0%,100%{opacity:.3;transform:scaleY(.8);}50%{opacity:.9;transform:scaleY(1.2);}}
 
-        <div class="header-media">
-          <!-- Minion GIF — left -->
-          <img src="{{ url_for('static', filename='source.gif') }}"
-               alt="Dancing Minion"
-               class="minion-gif" />
+    #prog{position:absolute;left:0;bottom:0;height:2px;width:0%;background:var(--gold);
+          z-index:6;box-shadow:0 0 12px rgba(245,200,0,.6);}
 
-          <!-- Hero banana photo — right -->
-          <video class="hero-banana-img"
-                 autoplay loop muted playsinline
-                 style="object-fit:cover;">
-            <source src="{{ url_for('static', filename='putturumees_gif.mp4') }}" type="video/mp4" />
-          </video>
-        </div>
+    /* ════════ APP ════════ */
+    #app{position:relative;z-index:10;
+         background:radial-gradient(130% 70% at 50% 0%, #fffefb 0%, var(--cream) 58%);
+         border-radius:32px 32px 0 0;margin-top:-32px;
+         box-shadow:0 -30px 90px rgba(0,0,0,.55);overflow:hidden;}
 
-        <p class="description">
-          Upload a banana photo — AI will check ripeness &amp; estimate seed count 🍌
-        </p>
-      </header>
+    /* eyebrow with flank rules */
+    .eyebrow{display:flex;align-items:center;justify-content:center;gap:16px;padding-top:78px;}
+    .eyebrow span{font-size:.58rem;letter-spacing:.44em;text-transform:uppercase;color:var(--muted);}
+    .eyebrow i{width:36px;height:1px;background:linear-gradient(to right,transparent,rgba(0,0,0,.22));}
+    .eyebrow i:last-child{background:linear-gradient(to left,transparent,rgba(0,0,0,.22));}
 
-      <!-- ── Upload Section ── -->
-      <div class="upload-section">
+    .ahdr{text-align:center;padding:20px 40px 6px;}
+    .ahdr h2{font-family:var(--serif);font-weight:400;font-size:clamp(2rem,4.6vw,3.2rem);
+             letter-spacing:.004em;color:var(--ink);line-height:1.08;}
+    .ahdr h2 em{font-style:italic;color:#c79e00;}
+    .ahdr p{margin:1rem auto 0;font-size:.9rem;color:var(--muted);max-width:470px;line-height:1.65;}
 
-        <!-- File upload card -->
-        <div class="upload-card">
-          <h2><i class="fas fa-upload"></i> Upload Image</h2>
-          <form action="{{ url_for('upload') }}"
-                method="post"
-                enctype="multipart/form-data"
-                class="upload-form"
-                id="uploadForm">
+    /* steps */
+    .steps{max-width:940px;margin:56px auto 0;padding:0 26px;
+           display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+    .step{position:relative;padding:32px 24px;text-align:center;border-radius:12px;
+          background:rgba(255,255,255,.55);border:1px solid rgba(0,0,0,.05);
+          transition:transform .45s cubic-bezier(.2,.7,.2,1),box-shadow .45s ease,background .45s ease;}
+    .step:hover{transform:translateY(-6px);background:#fff;box-shadow:0 22px 48px rgba(140,105,0,.10);}
+    .step .n{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;
+             border-radius:50%;border:1px solid rgba(199,158,0,.4);color:#c79e00;
+             font-family:var(--serif);font-size:1.05rem;margin-bottom:16px;}
+    .step h4{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;margin-bottom:9px;color:var(--ink);}
+    .step p{font-size:.78rem;color:var(--muted);line-height:1.6;}
+    @media(max-width:640px){.steps{grid-template-columns:1fr;}}
 
-            <div class="file-input-wrapper">
-              <input type="file"
-                     name="image"
-                     accept="image/*"
-                     required
-                     id="fileInput" />
-              <label for="fileInput" class="file-label" id="fileLabel">
-                <i class="fas fa-cloud-upload-alt"></i>
-                <span id="fileLabelText">Choose a file or drag it here</span>
-              </label>
-            </div>
+    /* cards */
+    .abody{max-width:940px;margin:0 auto;padding:66px 26px 24px;
+           display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+    @media(max-width:640px){.abody{grid-template-columns:1fr;}}
+    .card{position:relative;background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:16px;
+          padding:36px;box-shadow:0 12px 34px rgba(0,0,0,.04);overflow:hidden;
+          transition:transform .45s cubic-bezier(.2,.7,.2,1),box-shadow .45s ease;}
+    .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:0;
+                  background:linear-gradient(to right,transparent,var(--gold),transparent);
+                  transition:opacity .45s ease;}
+    .card:hover{transform:translateY(-7px);box-shadow:0 30px 64px rgba(0,0,0,.11);}
+    .card:hover::before{opacity:1;}
+    .card h3{font-size:.62rem;letter-spacing:.3em;text-transform:uppercase;color:var(--muted);
+             margin-bottom:28px;display:flex;align-items:center;gap:12px;}
+    .card h3 i{color:var(--ink);font-size:.82rem;background:var(--gold);
+               width:30px;height:30px;border-radius:9px;
+               display:flex;align-items:center;justify-content:center;}
 
-            <!-- Confirmation message shown after file selection -->
-            <div id="confirm-toast">
-              <i class="fas fa-circle-check"></i>
-              <span>Selected: <span id="selected-filename"></span></span>
-            </div>
+    /* drop zone */
+    .fdrop{border:1.5px dashed rgba(0,0,0,.16);border-radius:14px;padding:44px 20px;text-align:center;
+           cursor:pointer;transition:all .3s ease;margin-bottom:16px;background:transparent;}
+    .fdrop:hover{border-color:var(--gold);
+                 background:linear-gradient(rgba(245,200,0,.06),rgba(245,200,0,.02));}
+    .fdrop .ico{font-size:2rem;color:rgba(0,0,0,.18);margin-bottom:12px;
+                transition:transform .3s ease,color .3s ease;}
+    .fdrop:hover .ico{transform:translateY(-4px);color:#d4ab00;}
+    .fdrop .lbl{font-size:.78rem;color:var(--muted);}
+    .fdrop .hint{display:block;margin-top:6px;font-size:.6rem;letter-spacing:.1em;
+                 text-transform:uppercase;color:rgba(0,0,0,.26);}
+    .fdrop input[type=file]{display:none;}
+    #fnm{font-size:.7rem;color:#c79e00;margin-bottom:14px;min-height:1.1em;font-weight:500;}
 
-            <button type="submit" class="fun-button" style="margin-top:1rem; width:100%;">
-              <i class="fas fa-magnifying-glass"></i> Analyse Banana
-            </button>
-          </form>
-        </div>
+    /* button */
+    .btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px;
+         background:var(--ink);color:var(--gold);border:none;
+         font-family:var(--sans);font-size:.64rem;font-weight:500;letter-spacing:.26em;
+         text-transform:uppercase;cursor:pointer;border-radius:10px;
+         transition:background .3s ease,gap .3s ease;}
+    .btn:hover{background:#2c2010;gap:16px;}
+    .btn i{font-size:.7rem;transition:transform .3s ease;}
+    .btn:hover i{transform:translateX(3px);}
 
-        <!-- Camera card -->
-        <div class="camera-card">
-          <h2><i class="fas fa-camera"></i> Use Camera</h2>
-          <div class="camera-wrapper">
-            <video id="video" width="280" height="210" autoplay></video>
-            <button id="snap" class="fun-button">
-              <i class="fas fa-camera"></i> Capture Photo
-            </button>
-          </div>
-          <canvas id="canvas" width="280" height="210" style="display:none;"></canvas>
-          <form id="cameraForm"
-                action="{{ url_for('upload') }}"
-                method="post"
-                enctype="multipart/form-data"
-                style="display:none;">
-            <input type="file" id="cameraImage" name="image" accept="image/*" />
-          </form>
-        </div>
+    /* camera */
+    .cprev{position:relative;background:#0e0b07;border-radius:12px;overflow:hidden;margin-bottom:14px;
+           aspect-ratio:4/3;display:flex;align-items:center;justify-content:center;}
+    .cprev .ph{position:absolute;display:flex;flex-direction:column;align-items:center;gap:8px;
+               color:rgba(255,255,255,.2);font-size:1.5rem;z-index:0;}
+    .cprev .ph small{font-size:.56rem;letter-spacing:.24em;text-transform:uppercase;}
+    #video{width:100%;height:100%;object-fit:cover;display:block;position:relative;z-index:1;}
 
-      </div>
+    /* footer */
+    footer{background:var(--bg);text-align:center;padding:50px 20px;margin-top:58px;
+           border-top:1px solid rgba(255,255,255,.06);}
+    footer .mk{font-family:var(--serif);font-weight:300;font-size:1.2rem;letter-spacing:.34em;
+               text-indent:.34em;color:#fff;}
+    footer .tg{display:block;margin-top:9px;font-size:.56rem;letter-spacing:.36em;
+               text-transform:uppercase;color:rgba(245,200,0,.7);}
+
+    /* scroll reveal */
+    .reveal{opacity:0;transform:translateY(28px);
+            transition:opacity .8s cubic-bezier(.2,.7,.2,1),transform .8s cubic-bezier(.2,.7,.2,1);}
+    .reveal.in{opacity:1;transform:none;}
+  </style>
+</head>
+<body>
+
+<!-- ════════ HERO ════════ -->
+<section id="hero">
+  <div id="stage">
+    <canvas id="fc"></canvas>
+    <div id="loader"><div class="ring"></div></div>
+    <div id="prog"></div>
+    <div class="hud">
+      <div id="brand"><h1>PAZHAM</h1><p class="sub">Banana Intelligence</p></div>
+      <div id="lead"><p>Every banana tells a story — its seeds, its curve, its character. We read it.</p></div>
+      <div id="scrollHint">scroll</div>
     </div>
+  </div>
+</section>
 
-    <script src="{{ url_for('static', filename='camera.js') }}"></script>
-    <script>
-      // ── File selection confirmation ────────────────────────────
-      const fileInput   = document.getElementById('fileInput');
-      const toast       = document.getElementById('confirm-toast');
-      const nameSpan    = document.getElementById('selected-filename');
-      const labelText   = document.getElementById('fileLabelText');
+<!-- ════════ APP ════════ -->
+<main id="app">
+  <div class="eyebrow reveal"><i></i><span>The Analyzer</span><i></i></div>
+  <div class="ahdr reveal">
+    <h2>Analyze Your <em>Banana</em></h2>
+    <p>Upload an image or use your camera, and our model predicts seed count and curvature in seconds.</p>
+  </div>
+  <div class="steps">
+    <div class="step reveal"><span class="n">01</span><h4>Capture</h4><p>Snap a photo or upload an existing banana image.</p></div>
+    <div class="step reveal" style="transition-delay:.09s"><span class="n">02</span><h4>Analyze</h4><p>Our trained model studies the fruit's form.</p></div>
+    <div class="step reveal" style="transition-delay:.18s"><span class="n">03</span><h4>Predict</h4><p>Get seed count and curvature instantly.</p></div>
+  </div>
+  <div class="abody">
+    <div class="card reveal">
+      <h3><i class="fas fa-image"></i> Upload Image</h3>
+      <form action="{{ url_for('upload') }}" method="post" enctype="multipart/form-data">
+        <label class="fdrop" id="fdrop" for="fi">
+          <div class="ico"><i class="fas fa-cloud-arrow-up"></i></div>
+          <div class="lbl">Choose a file or drag it here<span class="hint">JPG or PNG</span></div>
+          <input type="file" name="image" id="fi" accept="image/*" required>
+        </label>
+        <div id="fnm"></div>
+        <button type="submit" class="btn">Analyze Image <i class="fas fa-arrow-right"></i></button>
+      </form>
+    </div>
+    <div class="card reveal" style="transition-delay:.1s">
+      <h3><i class="fas fa-camera"></i> Use Camera</h3>
+      <div class="cprev">
+        <span class="ph"><i class="fas fa-camera"></i><small>Camera preview</small></span>
+        <video id="video" autoplay playsinline></video>
+      </div>
+      <button id="snap" class="btn">Capture Photo <i class="fas fa-circle-dot"></i></button>
+      <canvas id="canvas" width="320" height="240" style="display:none"></canvas>
+      <form id="cameraForm" action="{{ url_for('upload') }}" method="post"
+            enctype="multipart/form-data" style="display:none">
+        <input type="file" id="cameraImage" name="image" accept="image/*">
+      </form>
+    </div>
+  </div>
+  <footer class="reveal"><div class="mk">PAZHAM</div><span class="tg">Banana Intelligence</span></footer>
+</main>
 
-      fileInput.addEventListener('change', function () {
-        if (this.files && this.files.length > 0) {
-          const name = this.files[0].name;
-          nameSpan.textContent = name;
-          labelText.textContent = '✅ ' + name;
-          toast.classList.add('visible');
-        }
-      });
+<script src="{{ url_for('static', filename='camera.js') }}"></script>
+<script>
+// ══════════════════════════════════════════════════════
+//  CANVAS FRAME-SEQUENCE SCRUB  (every frame, butter-smooth)
+// ══════════════════════════════════════════════════════
+const FRAME_COUNT = 120;                       // f000 … f119
+const FRAME_URL   = i => `/static/frames/f${String(i).padStart(3,'0')}.jpg`;
 
-      // Drag-over highlight
-      const label = document.getElementById('fileLabel');
-      label.addEventListener('dragover',  () => label.classList.add('drag-over'));
-      label.addEventListener('dragleave', () => label.classList.remove('drag-over'));
-      label.addEventListener('drop',      () => label.classList.remove('drag-over'));
-    </script>
-  </body>
+const hero   = document.getElementById('hero');
+const cv     = document.getElementById('fc');
+const cx     = cv.getContext('2d');
+const loader = document.getElementById('loader');
+const brand  = document.getElementById('brand');
+const lead   = document.getElementById('lead');
+const hint   = document.getElementById('scrollHint');
+const prog   = document.getElementById('prog');
+
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const ease  = t=>t<.5?2*t*t:-1+(4-2*t)*t;
+const pr    = (s,a,b)=>clamp((s-a)/(b-a),0,1);
+
+// ── Canvas sizing (devicePixelRatio aware) ──
+let DPR = Math.min(devicePixelRatio||1, 2);
+function resize(){
+  DPR = Math.min(devicePixelRatio||1, 2);
+  cv.width  = innerWidth  * DPR;
+  cv.height = innerHeight * DPR;
+  drawFrame(curFrame);
+}
+addEventListener('resize', resize);
+
+// ── Progressive frame loader (batched — never blocks on all 120) ──
+const frames = new Array(FRAME_COUNT);
+let loaded = 0, next = 0, loaderHidden = false;
+const CONCURRENCY = 6;                          // matches browser's per-host cap
+
+function hideLoader(){
+  if(loaderHidden) return;
+  loaderHidden = true;
+  loader.style.opacity = 0;
+  setTimeout(()=>loader.style.display='none', 600);
+}
+
+function loadNext(){
+  if(next >= FRAME_COUNT) return;
+  const i = next++;
+  const img = new Image();
+  frames[i] = img;
+  const done = ()=>{ loaded++; loadNext(); };
+  img.onload = ()=>{
+    if(i === 0){ drawFrame(0); hideLoader(); }  // banana visible immediately
+    done();
+  };
+  img.onerror = done;                            // never stall the chain
+  img.src = FRAME_URL(i);
+}
+// kick off CONCURRENCY parallel chains
+for(let k=0;k<CONCURRENCY;k++) loadNext();
+// safety: reveal even if frame 0 is slow
+setTimeout(hideLoader, 2500);
+
+// ── Cover-fit draw (with downward bias so the stem clears the top) ──
+const TOP_BIAS = 0.075;   // push content down ~7.5% of viewport height
+function drawFrame(idx){
+  const img = frames[idx];
+  if(!img || !img.complete || !img.naturalWidth) return;
+  const cw=cv.width, ch=cv.height;
+  const ir=img.naturalWidth/img.naturalHeight, cr=cw/ch;
+  let dw,dh,dx,dy;
+  if(cr > ir){ dw=cw; dh=cw/ir; dx=0; dy=(ch-dh)/2; }
+  else       { dh=ch; dw=ch*ir; dy=0; dx=(cw-dw)/2; }
+  dy += ch * TOP_BIAS;                     // shift down → dark headroom up top
+  cx.clearRect(0,0,cw,ch);
+  cx.drawImage(img, dx, dy, dw, dh);
+}
+
+// ── Scroll → frame (with lerp smoothing) ──
+let targetIdx = 0;     // float
+let curIdx    = 0;     // float, eased
+let curFrame  = 0;     // int drawn
+
+function onScroll(){
+  const maxS = hero.offsetHeight - innerHeight;
+  const s = clamp(scrollY / maxS, 0, 1);
+  targetIdx = s * (FRAME_COUNT - 1);
+
+  // ── UI reveals ──
+  const bFade = ease(pr(s,.04,.20));
+  brand.style.opacity   = 1 - bFade;
+  // keep vertical centering (desktop) while drifting up as you scroll in
+  const wide = innerWidth > 640;
+  brand.style.transform = wide
+    ? `translateY(-50%) translateY(${-bFade*40}px)`
+    : `translateY(${-bFade*40}px)`;
+
+  const lIn  = ease(pr(s,.34,.50));
+  const lOut = ease(pr(s,.70,.86));
+  lead.style.opacity   = lIn*(1-lOut);
+  lead.style.transform = `translateY(${(1-lIn)*30 - lOut*30}px)`;
+
+  hint.style.opacity = (1-ease(pr(s,0,.08)))*.6;
+  prog.style.width   = (s*100).toFixed(2)+'%';
+}
+addEventListener('scroll', onScroll, {passive:true});
+onScroll();
+
+// ── rAF loop: ease current toward target, draw on change ──
+function loop(){
+  curIdx += (targetIdx - curIdx) * 0.18;       // smoothing
+  const idx = Math.round(curIdx);
+  if(idx !== curFrame && frames[idx] && frames[idx].complete){
+    curFrame = idx;
+    drawFrame(idx);
+  }
+  requestAnimationFrame(loop);
+}
+resize();
+loop();
+
+// ══════════════════════════════════════════════════════
+//  FILE INPUT
+// ══════════════════════════════════════════════════════
+document.getElementById('fi').addEventListener('change', function(){
+  document.getElementById('fnm').textContent = this.files[0]?.name || '';
+});
+const fdrop = document.getElementById('fdrop');
+['dragover','dragenter'].forEach(e=>fdrop.addEventListener(e,ev=>{
+  ev.preventDefault(); fdrop.style.borderColor='var(--gold)';
+}));
+['dragleave','drop'].forEach(e=>fdrop.addEventListener(e,()=>{ fdrop.style.borderColor=''; }));
+
+// ── Scroll-reveal for app section ──
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+  });
+}, {threshold:.16, rootMargin:'0px 0px -8% 0px'});
+document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
+</script>
+</body>
 </html>
