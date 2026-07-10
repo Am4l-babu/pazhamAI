@@ -1,10 +1,16 @@
 """
-model_utils.py - Banana Analysis using Groq Vision API (Llama 4 Scout)
-Replaces the overfitted BananaNet PyTorch model.
-Capabilities:
-  - Detect if the image contains a banana
-  - Classify ripeness on a 1-5 scale (matching training data)
-  - Estimate seed count based on visual analysis + training data statistics
+model_utils.py - Hybrid banana analysis: trained model + Groq vision as gate/validator.
+
+Pipeline:
+  1. Groq vision (Llama 4 Scout) checks whether the image actually contains a banana.
+     If not, we bail out early instead of running the model on garbage input.
+  2. Our own trained BananaNet model (exported to ONNX so it stays deploy-light on
+     Vercel) predicts seed count + curvature from the image.
+  3. Groq is asked a second time to sanity-check the model's numbers against what
+     it can see in the photo. If the model's prediction looks like a hallucination
+     (e.g. wildly out of range for what's actually in the image), Groq's own
+     best-guess estimate is used instead, so the user never sees a nonsense value
+     with no way of knowing it's wrong.
 """
 
 import os
@@ -12,52 +18,53 @@ import io
 import json
 import re
 import base64
+
+import numpy as np
+from PIL import Image
+import onnxruntime as ort
 from groq import Groq
 from dotenv import load_dotenv
 
 load_dotenv()  # loads .env from project root
-from PIL import Image
 
-# ── Training data statistics for seed count estimation ──────────────────────
-# Derived from clean_dataset.csv (32 samples)
-SEED_STATS = {
-    "min": 102,
-    "max": 427,
-    "mean": 261,
-    "by_ripeness": {
-        1: {"mean": 257, "min": 146, "max": 373},   # unripe
-        2: {"mean": 281, "min": 147, "max": 421},   # slightly unripe
-        3: {"mean": 267, "min": 173, "max": 375},   # semi-ripe
-        4: {"mean": 295, "min": 102, "max": 392},   # ripe
-        5: {"mean": 228, "min": 103, "max": 374},   # overripe
-    }
-}
+# ── Trained model (ONNX) ─────────────────────────────────────────────────────
+_session = None
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "banana_net.onnx")
+IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
-RIPENESS_LABELS = {
-    1: "Unripe 🟢",
-    2: "Slightly Unripe 🟡",
-    3: "Semi-Ripe 🟡",
-    4: "Ripe ✅",
-    5: "Overripe 🟤",
-}
 
-RIPENESS_DESCRIPTIONS = {
-    1: "Green, firm, and starchy. Not ready to eat.",
-    2: "Mostly green with slight yellowing. Nearly ready.",
-    3: "Yellow with green tips. Good for cooking.",
-    4: "Fully yellow, sweet, and ready to eat.",
-    5: "Brown spots or fully brown. Very sweet, best for baking.",
-}
+def _get_session() -> ort.InferenceSession:
+    global _session
+    if _session is None:
+        _session = ort.InferenceSession(MODEL_PATH, providers=["CPUExecutionProvider"])
+    return _session
 
-# ── Groq API setup ───────────────────────────────────────────────────────────
-# NOTE: Client is created lazily so a missing key produces a clean error
-# response instead of crashing the Python process at import time (Vercel).
+
+def _preprocess(image_path: str) -> np.ndarray:
+    img = Image.open(image_path).convert("RGB").resize((224, 224))
+    arr = np.asarray(img, dtype=np.float32) / 255.0
+    arr = (arr - IMAGENET_MEAN) / IMAGENET_STD
+    arr = arr.transpose(2, 0, 1)[np.newaxis, ...].astype(np.float32)
+    return arr
+
+
+def _run_model(image_path: str) -> tuple:
+    session = _get_session()
+    inp = _preprocess(image_path)
+    out = session.run(None, {"input": inp})[0][0]
+    seeds = int(round(float(out[0])))
+    curvature = round(float(out[1]), 1)
+    return seeds, curvature
+
+
+# ── Groq vision (gate + validator) ───────────────────────────────────────────
 _client = None
 VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 
 def _get_client() -> Groq:
-    """Return (and cache) the Groq client, raising clearly if key is absent."""
+    """Return (and cache) the Groq client, raising clearly if the key is absent."""
     global _client
     if _client is None:
         api_key = os.getenv("GROQ_API_KEY")
@@ -71,151 +78,156 @@ def _get_client() -> Groq:
 
 
 def _encode_image_b64(image_path: str) -> str:
-    """Read image, resize if needed, and return base64-encoded JPEG string."""
     img = Image.open(image_path).convert("RGB")
-    # Limit to 1024px on longest side to stay within token limits
     img.thumbnail((1024, 1024), Image.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=85)
     return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
+def _ask_groq(image_b64: str, prompt: str) -> dict:
+    response = _get_client().chat.completions.create(
+        model=VISION_MODEL,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"},
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }
+        ],
+        temperature=0.1,
+        max_tokens=400,
+    )
+    raw = response.choices[0].message.content.strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+    return json.loads(raw)
+
+
+GATE_PROMPT = """You are checking whether an uploaded photo actually contains a banana \
+(whole, peeled, or cut open — any form counts).
+
+Return ONLY a valid JSON object, no markdown, no explanation outside the JSON:
+{"is_banana": true or false, "confidence": "high" or "medium" or "low", "reason": "one short sentence"}
+"""
+
+
+def _build_validate_prompt(seeds: int, curvature: float) -> str:
+    return f"""A specialized computer vision model analyzed this photo of a banana and predicted:
+  - seed count: {seeds}
+  - curvature: {curvature} degrees
+
+Important context: this is a NENDRAN banana seed-counting model, trained on bananas that \
+were physically split open and had every seed counted by hand. For this specific variety \
+and method, seed counts of roughly 100-450 (mean around 260) are NORMAL and EXPECTED —
+do NOT flag a value in that range as implausible just because ordinary supermarket \
+(Cavendish) bananas look seedless from the outside. Seeds are not visible in a photo of \
+an unsplit banana, so you cannot verify the exact count visually either way; only flag \
+the seed count as implausible if it is a clearly broken value (negative, zero for an \
+obviously intact/undamaged banana, or an extreme outlier like several thousand).
+
+Curvature (the bend angle in degrees, roughly 0-360) IS something you can visually judge \
+from the photo's shape — flag it if it clearly contradicts what the banana looks like.
+
+If a value is genuinely implausible:
+  - for curvature, give your own best-guess replacement based on the visible bend in the photo.
+  - for seeds, only replace it if the original was a broken value as described above; if so, \
+    give a best-guess replacement somewhere in the normal 100-450 range rather than a low \
+    round number like 0.
+
+Return ONLY a valid JSON object, no markdown, no explanation outside the JSON:
+{{"plausible": true or false, "reason": "one short sentence", "fallback_seeds": integer or null, "fallback_curvature": number or null}}
+"""
+
+
 def predict_from_image(image_path: str) -> dict:
     """
-    Analyse a banana image using Groq Vision (Llama 4 Scout).
+    Analyse a banana image: Groq gate -> trained model -> Groq sanity-check.
 
     Returns a dict with:
-        is_banana      (bool)
-        ripeness       (int 1-5, or None)
-        ripeness_label (str)
-        ripeness_desc  (str)
-        seeds          (int estimated)
-        seeds_range    (str e.g. "220 – 310")
-        confidence     (str high/medium/low)
-        notes          (str extra commentary)
-        visual_clues   (str colour/texture observations)
-        error          (str only if something went wrong)
+        is_banana   (bool or None on error)
+        seeds       (int or None)
+        curvature   (float or None)
+        source      ("model" | "groq_fallback" | "groq_gate" | None)
+        confidence  (str high/medium/low)
+        notes       (str, e.g. reason for a fallback override)
+        error       (str only if something went wrong)
     """
     try:
-        b64_image = _encode_image_b64(image_path)
+        b64 = _encode_image_b64(image_path)
+    except Exception as e:
+        return _error_result(f"Could not read the uploaded image: {e}")
 
-        prompt = """You are a banana analysis expert. Carefully look at the image and respond ONLY with a valid JSON object — no markdown fences, no explanation, no extra text.
+    # Step 1: Groq gate — is this even a banana?
+    try:
+        gate = _ask_groq(b64, GATE_PROMPT)
+    except Exception as e:
+        # If the gate check itself fails (e.g. API hiccup), don't block the
+        # whole feature on it — fall through and let the model try anyway.
+        gate = {"is_banana": True, "confidence": "low", "reason": f"gate check unavailable: {e}"}
 
-The JSON must follow this exact schema:
-{
-  "is_banana": true or false,
-  "ripeness": integer 1-5 or null,
-  "confidence": "high" or "medium" or "low",
-  "visual_clues": "brief description of colour, spots, texture seen in image",
-  "notes": "any other relevant observation (variety, freshness, defects, etc.)"
-}
-
-Ripeness scale (match to training data labels):
-  1 = Unripe         (fully green skin)
-  2 = Slightly Unripe (mostly green, starting to turn yellow)
-  3 = Semi-Ripe      (yellow with green tips or patches)
-  4 = Ripe           (fully yellow, possibly tiny brown flecks)
-  5 = Overripe       (heavy brown/black spots or fully brown/black)
-
-If the image does NOT contain a banana:
-  - set "is_banana" to false
-  - set "ripeness" to null
-  - set "confidence" based on how certain you are it is NOT a banana
-  - briefly describe what you see in "visual_clues"
-  - leave "notes" as an empty string
-
-Return ONLY the JSON. No markdown. No backticks."""
-
-        response = _get_client().chat.completions.create(
-            model=VISION_MODEL,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{b64_image}"
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": prompt,
-                        },
-                    ],
-                }
-            ],
-            temperature=0.1,   # low temperature for deterministic JSON output
-            max_tokens=512,
-        )
-
-        raw = response.choices[0].message.content.strip()
-
-        # Strip markdown fences if model wraps the JSON anyway
-        raw = re.sub(r"^```(?:json)?\s*", "", raw)
-        raw = re.sub(r"\s*```$", "", raw)
-
-        data = json.loads(raw)
-
-        is_banana = bool(data.get("is_banana", False))
-
-        if not is_banana:
-            return {
-                "is_banana": False,
-                "ripeness": None,
-                "ripeness_label": "N/A",
-                "ripeness_desc": "No banana detected in the image.",
-                "seeds": None,
-                "seeds_range": "N/A",
-                "confidence": data.get("confidence", "high"),
-                "notes": data.get("notes", ""),
-                "visual_clues": data.get("visual_clues", ""),
-                "error": None,
-            }
-
-        ripeness = data.get("ripeness")
-        if ripeness is not None:
-            ripeness = max(1, min(5, int(ripeness)))
-
-        seeds, seeds_range = _estimate_seeds(ripeness)
-
+    if not gate.get("is_banana", True):
         return {
-            "is_banana": True,
-            "ripeness": ripeness,
-            "ripeness_label": RIPENESS_LABELS.get(ripeness, "Unknown"),
-            "ripeness_desc": RIPENESS_DESCRIPTIONS.get(ripeness, ""),
-            "seeds": seeds,
-            "seeds_range": seeds_range,
-            "confidence": data.get("confidence", "medium"),
-            "notes": data.get("notes", ""),
-            "visual_clues": data.get("visual_clues", ""),
+            "is_banana": False,
+            "seeds": None,
+            "curvature": None,
+            "source": "groq_gate",
+            "confidence": gate.get("confidence", "medium"),
+            "notes": gate.get("reason", "This doesn't look like a banana."),
             "error": None,
         }
 
-    except json.JSONDecodeError as e:
-        return _error_result(f"Could not parse model response as JSON: {e}. Raw: {raw[:200]}")
+    # Step 2: our trained model
+    try:
+        seeds, curvature = _run_model(image_path)
     except Exception as e:
-        return _error_result(str(e))
+        return _error_result(f"Model inference failed: {e}")
 
+    # Step 3: Groq sanity-check — catch a hallucinated / out-of-range prediction
+    source = "model"
+    notes = ""
+    try:
+        check = _ask_groq(b64, _build_validate_prompt(seeds, curvature))
+        if not check.get("plausible", True):
+            fallback_seeds = check.get("fallback_seeds")
+            fallback_curvature = check.get("fallback_curvature")
+            if fallback_seeds is not None:
+                seeds = int(fallback_seeds)
+            if fallback_curvature is not None:
+                curvature = round(float(fallback_curvature), 1)
+            source = "groq_fallback"
+            notes = check.get(
+                "reason",
+                "The model's estimate looked off, so this value was adjusted after a secondary check."
+            )
+    except Exception:
+        # If the sanity-check call fails, still return the model's raw prediction
+        # rather than failing the whole request.
+        pass
 
-def _estimate_seeds(ripeness) -> tuple:
-    """Return (mean_estimate, 'min – max') based on ripeness level from training data."""
-    if ripeness and ripeness in SEED_STATS["by_ripeness"]:
-        stats = SEED_STATS["by_ripeness"][ripeness]
-        return stats["mean"], f"{stats['min']} – {stats['max']}"
-    return SEED_STATS["mean"], f"{SEED_STATS['min']} – {SEED_STATS['max']}"
+    return {
+        "is_banana": True,
+        "seeds": seeds,
+        "curvature": curvature,
+        "source": source,
+        "confidence": gate.get("confidence", "medium"),
+        "notes": notes,
+        "error": None,
+    }
 
 
 def _error_result(msg: str) -> dict:
     return {
         "is_banana": None,
-        "ripeness": None,
-        "ripeness_label": "Error",
-        "ripeness_desc": "",
         "seeds": None,
-        "seeds_range": "N/A",
+        "curvature": None,
+        "source": None,
         "confidence": "low",
         "notes": "",
-        "visual_clues": "",
         "error": msg,
     }
