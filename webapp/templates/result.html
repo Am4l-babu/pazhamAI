@@ -28,6 +28,9 @@
                        border-radius:10px;padding:12px 18px;font-size:.78rem;color:#8a6d00;
                        line-height:1.6;}
       .fallback-note i{margin-right:6px;}
+      .fallback-note.vision-down{max-width:none;margin:0 0 1.6rem;padding:0;text-align:left;}
+      .fallback-note.vision-down p{background:rgba(168,50,50,.06);
+                                   border-color:rgba(168,50,50,.28);color:#8a2f2f;}
     </style>
   </head>
   <body>
@@ -96,6 +99,14 @@
           <h2>Unnecessary Measurements</h2>
           <p>Seven further readings taken from the same photo. None of them are needed.</p>
         </div>
+
+        {% if result.vision_error %}
+        <div class="fallback-note vision-down">
+          <p><i class="fas fa-triangle-exclamation"></i><strong>Vision analysis unavailable</strong> &mdash;
+          {{ result.vision_error }}. The readings that depend on it are missing below, and we could not
+          confirm this photo contains a banana at all.</p>
+        </div>
+        {% endif %}
 
         <div class="u-grid">
           <div class="u-card">

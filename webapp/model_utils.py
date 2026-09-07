@@ -301,6 +301,20 @@ def _build_useless_report(check: dict, seeds, curvature, cv: dict) -> dict:
     return report
 
 
+def _describe_vision_error(exc: Exception) -> str:
+    """A visitor-facing reason, so a dead vision pass is not silently invisible."""
+    msg = str(exc).lower()
+    if "401" in msg or "unauthorized" in msg or "invalid_api_key" in msg:
+        return "the image-analysis service rejected our API key"
+    if "404" in msg or "model_not_found" in msg or "does not exist" in msg:
+        return "the configured vision model is no longer available"
+    if "429" in msg or "rate limit" in msg:
+        return "the image-analysis service is rate-limiting us right now"
+    if "timeout" in msg or "timed out" in msg:
+        return "the image-analysis service took too long to respond"
+    return "the image-analysis service could not be reached"
+
+
 def predict_from_image(image_path: str) -> dict:
     """
     Analyse a banana image: Groq gate -> trained model -> Groq sanity-check.
@@ -312,6 +326,7 @@ def predict_from_image(image_path: str) -> dict:
         source      ("model" | "groq_fallback" | "groq_gate" | None)
         confidence  (str high/medium/low)
         notes       (str, e.g. reason for a fallback override)
+        vision_error (str if the vision pass failed, so the page can say so)
         useless     (dict of the extra measurements, or None if we never got that far)
         error       (str only if something went wrong)
     """
@@ -321,11 +336,13 @@ def predict_from_image(image_path: str) -> dict:
         return _error_result(f"Could not read the uploaded image: {e}")
 
     # Step 1: Groq gate — is this even a banana?
+    vision_error = None
     try:
         gate = _ask_groq(b64, GATE_PROMPT)
     except Exception as e:
-        # If the gate check itself fails (e.g. API hiccup), don't block the
-        # whole feature on it — fall through and let the model try anyway.
+        # Don't block the whole feature on a gate hiccup, but do record that we
+        # never actually confirmed this is a banana.
+        vision_error = _describe_vision_error(e)
         gate = {"is_banana": True, "confidence": "low", "reason": f"gate check unavailable: {e}"}
 
     if not gate.get("is_banana", True):
@@ -336,6 +353,7 @@ def predict_from_image(image_path: str) -> dict:
             "source": "groq_gate",
             "confidence": gate.get("confidence", "medium"),
             "notes": gate.get("reason", "This doesn't look like a banana."),
+            "vision_error": None,
             "useless": None,
             "error": None,
         }
@@ -352,9 +370,10 @@ def predict_from_image(image_path: str) -> dict:
     notes = ""
     try:
         check = _ask_groq(b64, _build_analysis_prompt(seeds), max_tokens=600)
-    except Exception:
+    except Exception as e:
         # If the analysis call fails, still return the model's raw prediction
         # rather than failing the whole request.
+        vision_error = vision_error or _describe_vision_error(e)
         check = {}
 
     # Speckles and bruises are counted in pixels, not asked of the model.
@@ -382,6 +401,7 @@ def predict_from_image(image_path: str) -> dict:
         "source": source,
         "confidence": gate.get("confidence", "medium"),
         "notes": notes,
+        "vision_error": vision_error,
         "useless": _build_useless_report(check, seeds, curvature, cv),
         "error": None,
     }
@@ -395,6 +415,7 @@ def _error_result(msg: str) -> dict:
         "source": None,
         "confidence": "low",
         "notes": "",
+        "vision_error": None,
         "useless": None,
         "error": msg,
     }
