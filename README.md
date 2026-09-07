@@ -96,11 +96,30 @@ print(f"Predicted curvature: {predictions['curvature']}°")
 
 ## Model Performance
 
-Current model metrics on synthetic data:
-- Mean Squared Error: 0.20
-- R² Score: 0.80
+Measured honestly, the trained model does not respond to its input. It returns roughly
+399 seeds and 238 degrees of curvature for any image fed to it, including a solid black
+square, a solid white square, and random noise. Across all 41 training images the
+curvature output spans only 227-252 degrees.
 
-Note: These metrics are based on synthetic training data. Performance may vary with real-world data.
+The cause is dataset size. `clean_dataset.csv` has **31 labelled rows**, split 80/20 into
+about 24 training images, against a ResNet-18 with roughly 11 million parameters. That is
+some 460,000 parameters per training image, so the network cannot generalise; the
+curvature head has collapsed onto the label mean (234 degrees) and the seed head sits
+about 1.5 standard deviations above it.
+
+Curvature is therefore read from the photo by the vision pass instead. Seed count is
+still the model's, and is best read as a constant:
+
+- Seed count is presented in the UI as an estimate, not a measurement.
+- Predicting seed count from the tabular features was tested and rejected. Across 40
+  model/feature combinations under leave-one-out cross-validation, the best result beat
+  a predict-the-mean baseline by 8.2 MAE — but running the identical search on shuffled
+  labels, where no relationship can exist, produced gains as large as 9.5. The apparent
+  improvement is selection noise, not signal.
+
+Making the seed count meaningful would need a substantially larger labelled dataset, and
+possibly a different input entirely, since seeds are not visible in a photo of an unsplit
+banana.
 
 # Screenshots
 ![3](https://github.com/user-attachments/assets/c5d8c609-2515-45b2-8423-5dd5a94a8deb)

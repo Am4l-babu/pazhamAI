@@ -129,6 +129,13 @@ button:hover, .fun-button:hover {
     margin: 0.3rem 0;
 }
 
+.prediction-note {
+    margin: .5rem 0 0;
+    font-size: .64rem;
+    line-height: 1.5;
+    color: var(--muted);
+}
+
 .back-button {
     display: inline-flex;
     align-items: center;
