@@ -40,7 +40,7 @@
       </div>
     </nav>
 
-    <div class="container">
+    <div class="container wide">
       <h1><i class="fas fa-chart-bar"></i> Analysis Results</h1>
 
       {% if result.error %}
@@ -85,10 +85,142 @@
             <div class="prediction-item">
               <i class="fas fa-ruler-combined"></i>
               <h3>Curvature</h3>
-              <p class="prediction-value">{{ result.curvature }}°</p>
+              <p class="prediction-value">{{ "%.2f"|format(result.curvature) }}°</p>
             </div>
           </div>
         </div>
+
+        {% set u = result.useless %}
+        {% if u %}
+        <div class="section-head">
+          <h2>Unnecessary Measurements</h2>
+          <p>Seven further readings taken from the same photo. None of them are needed.</p>
+        </div>
+
+        <div class="u-grid">
+          <div class="u-card">
+            <h3><i class="fas fa-shapes"></i> Shape Classification</h3>
+            <p class="u-sub">Five categories. One of them is not a shape.</p>
+            <div class="shape-scale">
+              {% for name in u.shape_classes %}
+                <span class="shape-pill{% if name == u.shape_class %} on{% if name == 'Suspicious' %} sus{% endif %}{% endif %}">{{ name }}</span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div class="u-card">
+            <h3><i class="fas fa-temperature-half"></i> Ripeness Detector</h3>
+            <p class="u-sub">To a precision no recipe has ever called for.</p>
+            {% if u.ripeness_percent is not none %}
+              <p class="u-big">{{ u.ripeness_percent }}<span class="u-unit">%</span></p>
+              <div class="ripe-bar" style="--rest:{{ 100 - u.ripeness_percent }}%"></div>
+              <div class="ripe-scale"><span>Green</span><span>Yellow</span><span>Brown</span></div>
+            {% else %}
+              <p class="u-none">Ripeness could not be read from this photo.</p>
+            {% endif %}
+          </div>
+
+          <div class="u-card">
+            <h3><i class="fas fa-braille"></i> Spot Counter</h3>
+            <p class="u-sub">Every brown speckle, and how many to expect later.</p>
+            {% if u.spot_count is not none %}
+              <p class="u-big">{{ u.spot_count }}<span class="u-unit"> spots</span></p>
+              <ul class="spot-days">
+                {% for day in u.spot_forecast %}
+                  <li>
+                    <span class="d">In {{ day.day }} day{{ '' if day.day == 1 else 's' }}</span>
+                    <span class="v">{{ day.spots }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p class="u-none">Spots could not be counted on this photo.</p>
+            {% endif %}
+          </div>
+
+          <div class="u-card">
+            <h3><i class="fas fa-scale-balanced"></i> Weight vs. Length Analyzer</h3>
+            <p class="u-sub">Density, derived from figures nobody asked for.</p>
+            {% if u.density is not none %}
+              <p class="u-big">{{ u.density }}<span class="u-unit"> g/cm&sup3;</span></p>
+              <ul class="stat-rows">
+                <li><span class="k">Length</span><span class="v">{{ u.length_cm }} cm</span></li>
+                <li><span class="k">Width</span><span class="v">{{ u.width_cm }} cm</span></li>
+                <li><span class="k">Weight</span><span class="v">{{ u.weight_g }} g</span></li>
+                <li><span class="k">Estimated volume</span><span class="v">{{ u.volume_cm3 }} cm&sup3;</span></li>
+                <li><span class="k">Mass per cm</span><span class="v">{{ u.grams_per_cm }} g/cm</span></li>
+                {% if u.seeds_per_cm is not none %}
+                  <li><span class="k">Seeds per cm</span><span class="v">{{ u.seeds_per_cm }}</span></li>
+                {% endif %}
+              </ul>
+              <p class="verdict">
+                {% if u.floats %}Less dense than water, so it would float.{% else %}Denser than water, so it would sink.{% endif %}
+                This bears on nothing.
+              </p>
+            {% else %}
+              <p class="u-none">Dimensions could not be estimated from this photo.</p>
+            {% endif %}
+          </div>
+
+          <div class="u-card">
+            <h3><i class="fas fa-location-crosshairs"></i> End Detection</h3>
+            <p class="u-sub">Computer vision determines which end is the top.</p>
+            {% if u.top_end %}
+              {% set pair = ['left', 'right'] if u.top_end in ['left', 'right'] else ['top', 'bottom'] %}
+              <div class="end-diagram">
+                {% for side in pair %}
+                  <span class="marker{% if side == u.top_end %} is-top{% endif %}">{{ side }}</span>
+                  {% if not loop.last %}<span aria-hidden="true">&#127820;</span>{% endif %}
+                {% endfor %}
+              </div>
+              {% if u.top_end_reason %}<p class="u-sub">{{ u.top_end_reason }}</p>{% endif %}
+              <div class="sure-row">
+                <span class="sure-q">Are you sure?</span>
+                <button type="button" class="fun-button sure-btn" data-sure>Yes</button>
+                <button type="button" class="fun-button sure-btn" data-sure>No</button>
+              </div>
+              <p class="sure-reply" id="sure-reply" role="status" aria-live="polite"></p>
+            {% else %}
+              <p class="u-none">Neither end could be established as the top.</p>
+            {% endif %}
+          </div>
+
+          <div class="u-card">
+            <h3><i class="fas fa-rotate"></i> Rotation Counter</h3>
+            <p class="u-sub">Drag the platform. It counts the degrees.</p>
+            <div class="rot-stage">
+              <div class="rot-plate" id="rot-plate" role="slider" tabindex="0"
+                   aria-label="Rotating platform" aria-valuetext="0 degrees turned">
+                <div class="rot-arm" id="rot-arm" aria-hidden="true">&#127820;</div>
+              </div>
+              <p class="rot-readout" id="rot-total">0.00&deg;</p>
+              <p class="rot-meta" id="rot-revs">0.000 revolutions of no consequence</p>
+              <p class="rot-hint">No purpose whatsoever.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="u-grid one" style="margin-top:1.4rem">
+          <div class="u-card">
+            <h3><i class="fas fa-vector-square"></i> Bruise Detector</h3>
+            <p class="u-sub">Bruises you can already see, now with boxes around them.</p>
+            {% if u.bruises %}
+              <div class="bruise-wrap">
+                <img src="{{ url_for('uploaded_file', filename=filename) }}"
+                     alt="Analyzed banana photo with bruise regions outlined" />
+                {% for b in u.bruises %}
+                  <div class="bruise-box {{ b.severity }}"
+                       style="left:{{ b.x }}%;top:{{ b.y }}%;width:{{ b.w }}%;height:{{ b.h }}%">
+                    <span>{{ b.label }} &middot; {{ b.severity }}</span>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="u-none">No bruises detected. There is nothing to draw a box around.</p>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
       {% endif %}
 
       <a href="{{ url_for('index') }}" class="fun-button back-button">
@@ -101,5 +233,6 @@
       <span class="tg">Banana Intelligence</span>
       <p class="ft-copy">&copy; {{ current_year }} Pazham. All rights reserved.</p>
     </footer>
+    <script src="{{ url_for('static', filename='useless.js') }}"></script>
   </body>
 </html>

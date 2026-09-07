@@ -33,7 +33,36 @@ The model takes the following measurements as input:
 ### Predictions
 The model predicts:
 1. Number of seeds
-2. Curvature (degrees)
+2. Curvature (degrees), reported to two decimal places
+
+Curvature is measured by the vision pass rather than the trained model, whose curvature
+head returns a near-constant regardless of the image.
+
+### Unnecessary Measurements
+
+Every upload also returns seven further readings, none of which anyone needs:
+
+| Reading | Output |
+| --- | --- |
+| Ripeness detector | Ripeness as an exact percentage |
+| Spot counter | Brown spots visible now, plus a three-day forecast |
+| Shape classification | Straight / Slightly curved / Curved / Extremely curved / Suspicious |
+| Weight vs. length analyzer | Density in g/cm3, and whether the banana would float |
+| End detection | Which end is the top, then asks whether you are sure |
+| Bruise detector | Bounding boxes drawn around bruises you can already see |
+| Rotation counter | Degrees turned on a draggable platform, to no end |
+
+Spot count and bruise boxes are measured in pixels by `webapp/spot_detect.py`: the peel is
+separated from the background, pixels meaningfully darker than it are marked, and those are
+grouped into connected regions. Small regions are speckles, large ones are bruises. This runs
+in about 12 ms and needs no API. Blemishes that span half the frame or run off its edge are
+discarded, so a cluttered photo reports nothing rather than boxing the tablecloth.
+
+Shape class, volume, density and the spot forecast are arithmetic derived in
+`webapp/model_utils.py`. Ripeness, curvature, the top end and the raw dimensions are read
+from the photo by the vision pass, which shares a single API call with the seed-count
+sanity-check so the page costs two requests rather than nine. Without a `GROQ_API_KEY`
+those readings degrade to "could not be measured" rather than failing the request.
 
 ## Requirements
 
