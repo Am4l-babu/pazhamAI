@@ -43,6 +43,21 @@ def team():
     return render_template('team.html')
 
 
+@app.route('/gallery')
+def gallery():
+    photos = [
+        {'file': 'hackathon-desk.jpg', 'caption': 'The desk where it all happened — TinkerHub hackathon night.'},
+        {'file': 'split-bananas-seeds.jpg', 'caption': 'Bananas split open by hand to count every seed for ground truth.'},
+        {'file': 'banana-halves-slices.jpg', 'caption': 'More seed counting, one nendran at a time.'},
+        {'file': 'seed-cross-sections.jpg', 'caption': 'Cross-sections showing exactly how the seeds are arranged inside.'},
+        {'file': 'extracted-seed-strip.jpg', 'caption': "The seed core, pulled free from the flesh."},
+        {'file': 'cutting-process.jpg', 'caption': 'Dissecting the dataset, one cut at a time.'},
+        {'file': 'curvature-sketch.jpg', 'caption': 'Hand-sketching the curvature angles that fed the model.'},
+        {'file': 'late-night-training.jpg', 'caption': 'Training the model in the small hours of the morning.'},
+    ]
+    return render_template('gallery.html', photos=photos)
+
+
 @app.route('/upload', methods=['POST'])
 def upload():
     if 'image' not in request.files:

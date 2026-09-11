@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery — Pazham</title>
+  <meta name="description" content="Photos from the night Pazham was built — bananas split open by hand, seeds counted, and a model trained before sunrise.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8D%8C%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+  <style>
+    :root{--bg:#0b0906;--cream:#fdfbf3;--ink:#1a1408;--gold:#f5c800;--muted:rgba(0,0,0,.45);
+          --serif:'Fraunces',Georgia,serif;--sans:'Inter','Helvetica Neue',sans-serif;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--cream);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;}
+
+    #topnav{display:flex;align-items:center;justify-content:space-between;padding:28px 7vw;
+            background:var(--bg);}
+    .tn-brand{font-family:var(--serif);font-size:.9rem;letter-spacing:.3em;color:#fff;text-decoration:none;}
+    .tn-links{display:flex;gap:28px;}
+    .tn-links a{color:rgba(255,255,255,.75);text-decoration:none;font-size:.62rem;
+                letter-spacing:.18em;text-transform:uppercase;}
+    .tn-links a:hover,.tn-links a.active{color:var(--gold);}
+    @media(max-width:640px){ #topnav{padding:20px 5vw;flex-direction:column;gap:14px;} }
+
+    main{max-width:1100px;margin:0 auto;padding:80px 26px 100px;}
+    .hdr{text-align:center;margin-bottom:3.5rem;}
+    h1{font-family:var(--serif);font-weight:400;font-size:clamp(2.2rem,5vw,3.2rem);
+       margin-bottom:1rem;line-height:1.1;}
+    h1 em{font-style:italic;color:#c79e00;}
+    .sub{color:var(--muted);font-size:1rem;max-width:560px;margin:0 auto;line-height:1.6;}
+
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+    @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr);}}
+    @media(max-width:560px){.grid{grid-template-columns:1fr;}}
+
+    .tile{position:relative;border-radius:14px;overflow:hidden;cursor:zoom-in;
+          background:#000;box-shadow:0 12px 34px rgba(0,0,0,.08);
+          aspect-ratio:4/3;}
+    .tile img{width:100%;height:100%;object-fit:cover;display:block;
+              transition:transform .5s cubic-bezier(.2,.7,.2,1);}
+    .tile:hover img{transform:scale(1.06);}
+    .tile .cap{position:absolute;left:0;right:0;bottom:0;padding:14px 16px 12px;
+               background:linear-gradient(to top,rgba(0,0,0,.75),transparent);
+               color:#fff;font-size:.74rem;line-height:1.4;
+               opacity:0;transform:translateY(6px);
+               transition:opacity .25s ease,transform .25s ease;}
+    .tile:hover .cap{opacity:1;transform:none;}
+
+    /* lightbox */
+    #lb{position:fixed;inset:0;z-index:200;background:rgba(11,9,6,.94);
+        display:flex;align-items:center;justify-content:center;padding:5vh 5vw;
+        opacity:0;pointer-events:none;transition:opacity .25s ease;}
+    #lb.open{opacity:1;pointer-events:auto;}
+    #lb figure{max-width:100%;max-height:100%;margin:0;text-align:center;}
+    #lb img{max-width:100%;max-height:80vh;border-radius:8px;
+            box-shadow:0 30px 80px rgba(0,0,0,.6);}
+    #lb figcaption{margin-top:16px;color:rgba(255,255,255,.8);font-size:.85rem;
+                   letter-spacing:.02em;}
+    #lb .close{position:absolute;top:26px;right:30px;color:rgba(255,255,255,.7);
+              font-size:1.4rem;cursor:pointer;background:none;border:none;}
+    #lb .close:hover{color:var(--gold);}
+    #lb .nav-btn{position:absolute;top:50%;transform:translateY(-50%);
+                background:rgba(255,255,255,.08);border:none;color:#fff;
+                width:44px;height:44px;border-radius:50%;cursor:pointer;font-size:1rem;}
+    #lb .nav-btn:hover{background:rgba(255,255,255,.18);color:var(--gold);}
+    #lb .prev{left:24px;} #lb .next{right:24px;}
+    @media(max-width:640px){
+      #lb .nav-btn{width:36px;height:36px;}
+      #lb .prev{left:10px;} #lb .next{right:10px;}
+    }
+
+    footer{background:var(--bg);text-align:center;padding:50px 20px;}
+    footer .mk{font-family:var(--serif);font-weight:300;font-size:1.2rem;letter-spacing:.34em;color:#fff;}
+    footer .tg{display:block;margin-top:9px;font-size:.56rem;letter-spacing:.36em;
+               text-transform:uppercase;color:rgba(245,200,0,.7);}
+    .ft-copy{margin-top:22px;font-size:.62rem;color:rgba(255,255,255,.3);}
+  </style>
+</head>
+<body>
+
+<nav id="topnav">
+  <a href="{{ url_for('index') }}" class="tn-brand">PAZHAM</a>
+  <div class="tn-links">
+    <a href="{{ url_for('index') }}#app">Analyzer</a>
+    <a href="{{ url_for('about') }}">Our Story</a>
+    <a href="{{ url_for('gallery') }}" class="active">Gallery</a>
+    <a href="{{ url_for('team') }}">Team</a>
+  </div>
+</nav>
+
+<main>
+  <div class="hdr">
+    <h1>The night we <em>built</em> this</h1>
+    <p class="sub">Bananas bought and split open by hand, seeds counted one by one, angles sketched on paper, and a model trained before sunrise. Here's the proof.</p>
+  </div>
+
+  <div class="grid" id="grid">
+    {% for photo in photos %}
+    <a class="tile" href="#" data-index="{{ loop.index0 }}">
+      <img src="{{ url_for('static', filename='gallery/' ~ photo.file) }}" alt="{{ photo.caption }}" loading="lazy">
+      <div class="cap">{{ photo.caption }}</div>
+    </a>
+    {% endfor %}
+  </div>
+</main>
+
+<div id="lb">
+  <button class="close" aria-label="Close">&times;</button>
+  <button class="nav-btn prev" aria-label="Previous"><i class="fas fa-chevron-left"></i></button>
+  <button class="nav-btn next" aria-label="Next"><i class="fas fa-chevron-right"></i></button>
+  <figure>
+    <img id="lbImg" src="" alt="">
+    <figcaption id="lbCap"></figcaption>
+  </figure>
+</div>
+
+<footer>
+  <div class="mk">PAZHAM</div>
+  <span class="tg">Banana Intelligence</span>
+  <p class="ft-copy">&copy; {{ current_year }} Pazham. All rights reserved.</p>
+</footer>
+
+<script>
+  const photos = [
+    {% for photo in photos %}
+    { src: "{{ url_for('static', filename='gallery/' ~ photo.file) }}", cap: {{ photo.caption | tojson }} }{{ "," if not loop.last }}
+    {% endfor %}
+  ];
+  const lb = document.getElementById('lb');
+  const lbImg = document.getElementById('lbImg');
+  const lbCap = document.getElementById('lbCap');
+  let current = 0;
+
+  function show(i){
+    current = (i + photos.length) % photos.length;
+    lbImg.src = photos[current].src;
+    lbImg.alt = photos[current].cap;
+    lbCap.textContent = photos[current].cap;
+  }
+  function open(i){ show(i); lb.classList.add('open'); }
+  function close(){ lb.classList.remove('open'); }
+
+  document.getElementById('grid').addEventListener('click', e => {
+    const tile = e.target.closest('.tile');
+    if(!tile) return;
+    e.preventDefault();
+    open(parseInt(tile.dataset.index, 10));
+  });
+  lb.querySelector('.close').addEventListener('click', close);
+  lb.querySelector('.prev').addEventListener('click', () => show(current - 1));
+  lb.querySelector('.next').addEventListener('click', () => show(current + 1));
+  lb.addEventListener('click', e => { if(e.target === lb) close(); });
+  document.addEventListener('keydown', e => {
+    if(!lb.classList.contains('open')) return;
+    if(e.key === 'Escape') close();
+    if(e.key === 'ArrowLeft') show(current - 1);
+    if(e.key === 'ArrowRight') show(current + 1);
+  });
+</script>
+
+</body>
+</html>
